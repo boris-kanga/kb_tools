@@ -1,0 +1,35 @@
+# [BASE]
+levenshtein~=0.20.9
+chardet~=5.1.0
+pandas
+numpy
+setuptools
+wheel
+
+# [DATABASE]
+
+# POSTGRES
+psycopg2-binary==2.9.9
+
+# [LOGGING]
+
+# EMALING]
+bs4
+lxml
+jinja2
+pyYaml
+
+# [DOCUBASE]
+werkzeug
+pyYaml
+xmltodict
+requests
+
+# [CUSTOM_ADMIN]
+flask
+flask_jwt_extended
+openpyxl~=3.0.10
+pillow>=10.3.0
+pyjwt
+requests
+SQLAlchemy
