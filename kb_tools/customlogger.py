@@ -9,11 +9,15 @@ import logging
 import os
 import sys
 import traceback
+import threading
 
 from . import tools
 
 
 class CustomLogger:
+
+    _current_logger = None
+
     def __init__(
         self,
         name,
@@ -87,12 +91,20 @@ class CustomLogger:
             )
 
         self._create_new_logger_handler()
+        if threading.current_thread().name != "MainThread":
+            CustomLogger._current_logger = self
 
     def send_all_logger_message_by_callback(self):
         if isinstance(self.log_capture_string, io.StringIO):
             self.callback(self.log_capture_string.getvalue())
             self.log_capture_string.truncate(0)
             self.log_capture_string.seek(0)
+
+    @classmethod
+    def current_logger(cls):
+        if CustomLogger._current_logger:
+            return CustomLogger._current_logger
+        return CustomLogger(cls.get_logger().name)
 
     @staticmethod
     def get_logger(name=None):

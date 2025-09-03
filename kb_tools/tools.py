@@ -411,8 +411,20 @@ class Cdict(dict):
         super().__delitem__(k)
         self.__callback_func()
 
+    def update(self, other, **kwargs):
+        if isinstance(other, dict) or hasattr(other, "items"):
+            for k, v in other.items():
+                self[k] = v
+        else:
+            super().update(other, **kwargs)
+
     def __setitem__(self, k, v):
         """Set self[key] to value."""
+        _dots = str(k).split(".", 1)
+        if len(_dots) > 1 and _dots[0] in self:
+            self[_dots[0]][_dots[1]] = v
+            return
+
         k = self.__parse_item(k)
         v = Cdict(
             v,
