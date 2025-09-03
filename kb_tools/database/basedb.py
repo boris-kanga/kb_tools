@@ -162,6 +162,17 @@ class BaseDB(abc.ABC):
 
         """
 
+    def execute(self, *args, **kwargs):
+        ignore_error = kwargs.pop("ignore_error", False)
+        try:
+            return self._execute(*args, **kwargs, ignore_error=False)
+        except Exception as err:  # noqa
+            self.rollback()
+            if not ignore_error:
+                raise err
+        return (list(args) + [kwargs.get("cursor")])[0]
+
+
     def _is_connected(self):
         return True
 
@@ -295,7 +306,7 @@ class BaseDB(abc.ABC):
         else:
             cursor = cur
         return_object = cursor
-        self._execute(cursor, script, params=value)
+        self.execute(cursor, script, params=value)
         if retrieve_id:
             if self.name == "MysqlDB":
                 return_object = cursor.lastrowid
@@ -347,7 +358,7 @@ class BaseDB(abc.ABC):
             # buffer = buffer.astype(object).
             # replace(DatasetFactory.NAN, None).to_dict("records")
             try:
-                self._execute(
+                self.execute(
                     cursor,
                     script,
                     params=[
@@ -512,7 +523,7 @@ class BaseDB(abc.ABC):
             self.reload_connexion()
         cursor = self.get_cursor()
         try:
-            cursor = self._execute(
+            cursor = self.execute(
                 cursor,
                 script,
                 params=params,
@@ -521,7 +532,7 @@ class BaseDB(abc.ABC):
             )
         except Exception as ex:
             self.LAST_REQUEST_COLUMNS = None
-            self.rollback()
+            # self.rollback()
             if not ignore_error:
                 raise Exception(ex)
             else:
