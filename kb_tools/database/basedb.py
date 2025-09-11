@@ -8,11 +8,13 @@ import os
 
 import pandas
 
+from kb_tools.customlogger import CustomLogger
+
 try:
     from tqdm import tqdm
 except ImportError:
 
-    def tqdm(iter_obj, total=None):
+    def tqdm(iter_obj, *_, **__):
         return (x for x in iter_obj)
 
 
@@ -24,6 +26,7 @@ class BaseDB(abc.ABC):
     DEFAULT_PORT = None
     MAX_BUFFER_INSERTING_SIZE = 2000
     LAST_REQUEST_COLUMNS = None
+    LAST_ROW_COUNT = None
 
     def __init__(self, **kwargs):
         self._kwargs = kwargs
@@ -34,6 +37,7 @@ class BaseDB(abc.ABC):
 
         self.db_object = None
         self._cursor_ = None
+        self.auto_commit = kwargs.get("auto_commit", True)
 
     @property
     def log_info(self):
@@ -51,8 +55,24 @@ class BaseDB(abc.ABC):
         return self._print_error
 
     @property
+    @abc.abstractmethod
     def get_schema(self):
-        return
+        """
+
+        Returns:
+            list of columns like:
+                {
+                    "columnName": "column",
+                    "type": "varchar",
+                    "tableName": "table",
+                    "columnDefault": "default_value",
+                    "nullable": 0
+                    "is_primary_key": 0
+                    "foreign_table_name": null
+                    "foreign_column_name": null
+                }
+        """
+        pass
 
     @staticmethod
     @abc.abstractmethod
@@ -64,6 +84,8 @@ class BaseDB(abc.ABC):
         return "BASE"
 
     def set_logger(self, logger):
+        if logger is None:
+            logger = CustomLogger.get_current()
         if callable(logger):
             self._print_info = logger
             self._print_error = logger
@@ -71,6 +93,7 @@ class BaseDB(abc.ABC):
             self._print_info = logger.info
         if hasattr(logger, "exception"):
             self._print_error = logger.exception
+        self._kwargs["logger"] = logger
 
     def __call__(self, *args, **kwargs):
         return self._cursor()
@@ -177,7 +200,7 @@ class BaseDB(abc.ABC):
         return True
 
     @staticmethod
-    def _check_if_cursor_has_rows(cursor):
+    def _check_if_cursor_has_rows(*_, **__):
         return True
 
     def commit(self):
@@ -317,7 +340,7 @@ class BaseDB(abc.ABC):
                     return_object = (
                         0 if not len(return_object) else return_object[0]
                     )
-        if cur is None:
+        if cur is None and self.auto_commit:
             self.commit()
         return return_object
 
@@ -370,7 +393,6 @@ class BaseDB(abc.ABC):
                     ],
                     method="many",
                 )
-                # self.commit()
             except Exception as ex:
 
                 self._print_error(
@@ -380,7 +402,8 @@ class BaseDB(abc.ABC):
 
                 self._print_error(ex)
                 return
-        self.commit()
+        if self.auto_commit:
+            self.commit()
 
     @staticmethod
     def prepare_insert_data(data):
@@ -405,11 +428,12 @@ class BaseDB(abc.ABC):
             self, cursor, limit=INFINITE, dict_res=False, export_name=None,
             sep=";"
     ):
+        self.LAST_REQUEST_COLUMNS = None
         try:
             if not self._check_if_cursor_has_rows(cursor):
                 return None
             columns = self._get_cursor_description(cursor).columns
-            assert columns is not None
+            assert columns is not None and columns
         except (AssertionError, Exception):
             return None
         self.LAST_REQUEST_COLUMNS = columns
@@ -456,7 +480,7 @@ class BaseDB(abc.ABC):
                         data.append(row)
             if export_name is not None:
                 return
-        except Exception:  # nosec
+        except Exception:  # noqa
             pass
         if limit == 1:
             if len(data):
@@ -530,6 +554,8 @@ class BaseDB(abc.ABC):
                 ignore_error=False,
                 connexion=self.db_object,
             )
+            if hasattr(cursor, "rowcount"):
+                self.LAST_ROW_COUNT = cursor.rowcount
         except Exception as ex:
             self.LAST_REQUEST_COLUMNS = None
             # self.rollback()
@@ -537,8 +563,9 @@ class BaseDB(abc.ABC):
                 raise Exception(ex)
             else:
                 self._print_error(ex)
-            return
-        self.commit()
+                return
+        if self.auto_commit:
+            self.commit()
         if _for_batch:
             return cursor
 

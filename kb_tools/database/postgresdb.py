@@ -68,7 +68,11 @@ class PostgresDB(BaseDB):
             WITH fields AS (
                 SELECT
                     column_name AS columnName,
-                    data_type AS type,
+                    data_type || (
+                        CASE WHEN character_maximum_length IS NOT NULL
+                            THEN '(' || character_maximum_length || ')'
+                            ELSE '' END
+                         ) AS type,
                     table_name AS tableName,
                     column_default AS columnDefault,
                     CASE WHEN is_nullable = 'YES' THEN 1 ELSE 0 END nullable

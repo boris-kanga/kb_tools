@@ -1,5 +1,5 @@
 # [kb_tools](https://github.com/boris-kanga/kb_tools.git)
-Centralise les packages et outils DDT
+Centralise les packages et outils
 
 
 ## Installation

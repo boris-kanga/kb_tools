@@ -108,9 +108,11 @@ class DatasetFactory:
             return final_col
 
     @staticmethod
-    def _check_delimiter(sample, check_in=None):
+    def _check_delimiter(sample, check_in=None, need_cols=None):
         if check_in is None:
             check_in = [",", "\t", ";", " ", ":", "$", "|"]
+        if not sample:
+            return None
         first_lines = "".join(sample)
         try:
             sep = (
@@ -119,6 +121,22 @@ class DatasetFactory:
                 .delimiter
             )
         except csv.Error:
+            if isinstance(need_cols, dict):
+                need_cols = list(need_cols.keys())
+            elif isinstance(need_cols, Iterable) and not isinstance(
+                    need_cols, str):
+                pass
+            else:
+                return None
+            for col in need_cols:
+                col = re.search(
+                    col + "(" +
+                    ("|".join(re.escape(x) for x in check_in)) +
+                    ")",
+                    sample[0]
+                )
+                if col:
+                    return col.groups()[0]
             sep = None
         return sep
 
@@ -173,7 +191,9 @@ class DatasetFactory:
                         ) as file:
                             sample = [file.readline() for _ in range(10)]
                             try:
-                                sep = cls._check_delimiter(sample, delimiters)
+                                sep = cls._check_delimiter(
+                                    sample, delimiters, need_cols=columns
+                                )
                                 assert sep, ""
                                 kwargs_["sep"] = sep
                                 used_sniffer = True
@@ -217,7 +237,8 @@ class DatasetFactory:
                                         ]
                                         try:
                                             sep = cls._check_delimiter(
-                                                sample, delimiters
+                                                sample, delimiters,
+                                                need_cols=columns
                                             )
                                             assert sep, ""
                                             kwargs_["sep"] = sep
@@ -237,7 +258,9 @@ class DatasetFactory:
             kk = {}
             if sep is None:
                 try:
-                    sep = DatasetFactory._check_delimiter(sample, delimiters)
+                    sep = cls._check_delimiter(
+                        sample, delimiters, need_cols=columns
+                    )
                     assert sep, ""
                     kk["delimiter"] = sep
                 except (csv.Error, AssertionError):

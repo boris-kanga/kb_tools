@@ -12,6 +12,8 @@ import sys
 import time
 import traceback
 import unicodedata
+import zipfile
+import tarfile
 
 try:
     import Levenshtein as Lev
@@ -48,12 +50,16 @@ def generate_password(size=None, punctuation=True):
     return "".join(part[:size])
 
 
-def get_no_filepath(filepath):
+def get_no_filepath(filepath, is_dir=False):
     index = 1
     f, ext = os.path.splitext(filepath)
     while os.path.exists(filepath):
         index += 1
         filepath = f + "_" + str(index) + ext
+    if os.path.isdir(filepath) or is_dir:
+        os.makedirs(filepath)
+    else:
+        open(filepath, "x").close()
     return filepath
 
 
@@ -78,7 +84,62 @@ def read_json_file(path, default=None) -> dict | list:
 def get_func_args(func):
     while hasattr(func, "__wrapped__"):
         func = func.__wrapped__
-    return func.__code__.co_varnames[: func.__code__.co_argcount]
+    return func.__code__.co_varnames[
+           : (func.__code__.co_argcount + func.__code__.co_kwonlyargcount)
+           ]
+
+
+def extract_file(
+        path, member=None, to_directory='.', file_type=None, pwd=None
+        ):
+    members = [None]
+    if isinstance(member, str):
+        members = [member]
+    elif isinstance(member, list):
+        members = member
+    method = "extractall"
+    if not isinstance(file_type, str):
+        _, file_type = os.path.splitext(path)
+    file_type = str(file_type).lower().strip()
+    if file_type.startswith("."):
+        file_type = file_type[1:]
+    assert file_type in ["zip", "tgz", "tar.gz", "tar.bz2", "tbz", "rar",
+                         "7z"], (
+            "Bad file %s given" % path)
+    if member is not None:
+        method = "extract"
+
+    if file_type == 'zip':
+        opener, mode = zipfile.ZipFile, 'r'
+    elif file_type == "rar":
+        import rarfile
+        opener, mode = rarfile.RarFile, 'r'
+    elif file_type == 'tar.gz' or file_type == 'tgz':
+        opener, mode = tarfile.open, 'r:gz'
+    elif file_type == 'tar.bz2' or file_type == 'tbz':
+        opener, mode = tarfile.open, 'r:bz2'
+    elif file_type == "7z":
+        import py7zr
+        if pwd:
+            opener = lambda _path, _mode, _pwd=pwd: py7zr.SevenZipFile(
+                _path, _mode, password=_pwd
+                )
+            pwd = None
+        else:
+            opener = py7zr.SevenZipFile
+        mode = 'r'
+    else:
+        raise ValueError("Bad file %s given" % path)
+
+    os.makedirs(to_directory, exist_ok=True)
+    with opener(path, mode) as open_obj:
+        kwargs = {"path": to_directory}
+        if pwd is not None:
+            kwargs["pwd"] = pwd
+        for member in members:
+            if member is not None:
+                kwargs["member"] = member
+            getattr(open_obj, method)(**kwargs)
 
 
 def generate_candidate(a, *args):
@@ -237,7 +298,7 @@ class Var(str):
 
     def __eq__(self, other):
         try:
-            if super().__eq__(other):
+            if super().__eq__(other) == True:
                 return True
             if not isinstance(other, Var):
                 other = format_var_name(
@@ -391,7 +452,7 @@ class Cdict(dict):
                     return args[0]
                 return args
             raise AttributeError(
-                "This attribute %s don't exists for this instance" % item
+                "This attribute `%s` don't exists for this instance" % item
             )
 
     def pop(self, k, *args):
@@ -449,12 +510,14 @@ class Cdict(dict):
 
 def get_buffer(obj, max_buffer=200, vv=True) -> tuple | ...:
     i = 0
-    if hasattr(obj, "shape"):
-
-        def length(x):
-            return x.shape[0]  # noqa E731
-
-        size = max(int(obj.shape[0] / max_buffer), 1)
+    if hasattr(obj, "index") and hasattr(obj, "shape"):
+        indexes = list(obj.index)
+        for i, index in get_buffer(indexes, max_buffer=max_buffer):
+            if vv:
+                yield i, obj.loc[index]
+            else:
+                yield obj.loc[index]
+        return
     else:
         length = len
         size = max(int(len(obj) / max_buffer), 1)
@@ -585,10 +648,10 @@ def last_file_lines(fname, N):
 
 
 def is_phone_number(number, retrieve=True, force_plus=True):
-    number = re.sub(r"\s-_", "", str(number))
-
-    if re.match(r"^\d{10}$", number):
-        if number[:2] in ("01", "07", "05"):
+    number = re.sub(r"[\s\-_]", "", str(number))
+    if re.match(r"^\d{9,10}$", number):
+        number = number.zfill(10)
+        if number[:2] in ("01", "07", "05", "27", "21", "25"):
             return True if not retrieve else "+225" + number
         return False if not retrieve else None
 
@@ -614,6 +677,10 @@ def is_phone_number(number, retrieve=True, force_plus=True):
         return False if not retrieve else None
 
     return True if not retrieve else suffix + number
+
+
+def is_email(value: str):
+    return re.match(r"^[\w\-.]+@([\w\-]+\.)+[\w\-]{2,4}$", value) is not None
 
 
 if __name__ == "__main__":
