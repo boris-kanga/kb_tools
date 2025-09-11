@@ -125,9 +125,12 @@ class DataManager:
         )
         db_object: BaseDB = class_object(**_kwargs)
 
-        if os.getenv("kb_tools_MIGRATION") and not os.getenv(
-                "kb_tools_MIGRATION_MANUALLY"):
-            cls.init_db(db_object, sgbd_name)
+        if os.getenv("DDT_TOOLS_AUTO_MIGRATION") and not os.getenv(
+                "DDT_TOOLS_MIGRATION_MANUALLY"):
+            try:
+                cls.init_db(db_object, sgbd_name)
+            finally:
+                os.environ["DDT_TOOLS_MIGRATION_DONE"] = "1"
 
         return db_object
 

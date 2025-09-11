@@ -163,7 +163,7 @@ def generate_candidate(a, *args):
             "last_index": len((a, *args)),
             "__eq__": _eq,
             "__neq__": lambda self, o: not self.__eq__(o),
-            "__str__": lambda s: a
+            "__repr__": lambda s: repr(a)
         },
     )
     return obj()
@@ -510,6 +510,8 @@ class Cdict(dict):
 
 def get_buffer(obj, max_buffer=200, vv=True) -> tuple | ...:
     i = 0
+    if max_buffer != int(max_buffer):
+        max_buffer = int(max_buffer) + 1
     if hasattr(obj, "index") and hasattr(obj, "shape"):
         indexes = list(obj.index)
         for i, index in get_buffer(indexes, max_buffer=max_buffer):
