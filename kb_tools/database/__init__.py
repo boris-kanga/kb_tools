@@ -543,12 +543,6 @@ class DataManager:
                     uri = uri[1:]
 
             sgbd_name = "sqlite"
-            try:
-                open(uri, "x").close()
-            except FileExistsError:
-                pass
-            except OSError:
-                raise ValueError("Bad file path given")
             file_name = uri
             username, password, host, port, database_name = (
                 None,
