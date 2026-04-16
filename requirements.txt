@@ -1,5 +1,5 @@
 # [BASE]
-levenshtein~=0.20.9
+levenshtein
 chardet~=5.1.0
 pandas
 numpy
