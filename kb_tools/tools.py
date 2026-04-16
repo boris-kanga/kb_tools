@@ -145,7 +145,11 @@ def extract_file(
 def generate_candidate(a, *args):
     def _eq(self, o):
         for index, i in enumerate((a, *args)):
-            if "%" in i:
+            if isinstance(i, re.Pattern):
+                if i.match(o):
+                    self.last_index = index
+                    return True
+            elif "%" in i:
                 reg = "^" + re.escape(i).replace("%", ".*?") + "$"
                 if re.match(reg, o, flags=re.I):
                     self.last_index = index
