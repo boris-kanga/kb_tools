@@ -151,7 +151,7 @@ def generate_candidate(a, *args):
                     return True
             elif "%" in i:
                 reg = "^" + re.escape(i).replace("%", ".*?") + "$"
-                if re.match(reg, o, flags=re.I):
+                if re.match(reg, o, flags=re.I | re.M):
                     self.last_index = index
                     return True
             else:
